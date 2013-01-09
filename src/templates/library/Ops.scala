@@ -65,7 +65,8 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   def emitClass(ops: DSLOps, stream: PrintWriter) {
     if (grpIsTpe(ops.grp)) {
       val tpe = grpAsTpe(ops.grp)
-      val data = DataStructs.filter(_.tpe == tpe).apply(0) // TODO
+      //val data = DataStructs.filter(_.tpe == tpe).apply(0) // TODO
+      val data = DataStructs.apply(0) // TODO // gibbons4
       stream.print("class " + data.tpe.name)
       stream.print(makeTpeParsWithBounds(data.tpePars))
       stream.print("(")  
@@ -74,7 +75,10 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       stream.println()
       stream.println(makeFieldsWithInitArgs(data))
       for (o <- unique(ops.ops) if o.style == infix) {       
-        stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.tail))
+        if (o.tpePars.length > 0) // gibbons4
+          stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.tail))
+        else 
+          stream.print("  def " + o.name)
         stream.print("(" + o.args.tail.zipWithIndex.map(t => opArgPrefix + (t._2+1) + ": " + repify(t._1)).mkString(",") + ")") 
         stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = data.tpePars))
         stream.println(" = {")

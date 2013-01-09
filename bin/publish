@@ -4,7 +4,11 @@ echo "sbt compile"
 sbt compile
 echo "forge ppl.dsl.forge.examples.SimpleVectorDSLRunner"
 forge ppl.dsl.forge.examples.SimpleVectorDSLRunner
-echo "rm -rf ../delite2/dsls/simplevector"
-rm -rf ../delite2/dsls/simplevector
-echo "cp -r build/simplevector ../delite2/dsls/"
-cp -r build/simplevector ../delite2/dsls/
+echo "forge ppl.dsl.forge.examples.OptiWrangleRunner"
+forge ppl.dsl.forge.examples.OptiWrangleRunner
+echo "rm -rf ../Delite/dsls/simplevector"
+rm -rf ../Delite/dsls/simplevector
+echo "rm -rf ../Delite/dsls/optiwrangle"
+rm -rf ../Delite/dsls/optiwrangle
+echo "cp -r build/optiwrangle ../Delite/dsls/"
+cp -r build/optiwrangle ../Delite/dsls/
