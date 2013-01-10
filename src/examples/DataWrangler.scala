@@ -19,12 +19,14 @@ trait OptiWrangle extends ForgeApplication with ScalaOps {
     val T = tpePar("T")
     val DataWrangler = tpe("DataWrangler")
     val Table = tpe("Table")
-    val Column = tpePar("Column") // parametrized columns?
-    val Transform = tpePar("Transform")
+    val Column = tpe("Column", List(T)) // parametrized columns?
+    val Transform = tpe("Transform")
+    val ArrayColumn = tpeInst(MArray(T), List(Column))
+    val ArrayTransform = tpeInst(MArray(T), List(Transform))
 
     //Data Structures
-    data(DataWrangler, List(), ("_transforms", MArray(Transform)), ("_numTransforms", MInt))
-    data(Table, List(), ("_columns", MArray(Column)), ("_numColumns", MInt)) // todo - by Name
+    data(DataWrangler, List(), ("_transforms", ArrayTransform), ("_numTransforms", MInt))
+    data(Table, List(), ("_columns", ArrayColumn), ("_numColumns", MInt)) // todo - by Name
     data(Column, List(T), ("_data", MArray(T)), ("length", MInt))
 
     //Ops
@@ -53,13 +55,7 @@ trait OptiWrangle extends ForgeApplication with ScalaOps {
     //Code Generators - these operations are likely not supported by Forge
     // -- Datawrangler 
     codegen (dw_new) ($cala, "new "+dw_new.tpeName+"(new Array[Transform]("+dw_new.quotedArg(0)+"), "+dw_new.quotedArg(0)+")")
-/*
-    codegen (dw_apply_transforms) ($cala, "" + 
-      "var cur : Table = " + dw_apply_transforms.quotedArg(1) + "" + 
-      "\"" + dw_apply_transforms.quotedArg(0) + "._transforms filter (t => t.status = \" Active \") foreach (t => cur = t.apply(cur))" + 
-      "\"cur" 
-    )
-*/
+    
     codegen (dw_apply_transforms) ($cala, stream.printLines(
       "var cur : Table = " + dw_apply_transforms.quotedArg(1),
       dw_apply_transforms.quotedArg(0) + "._transforms filter (t => t.status = \"active\") foreach (t=> cur = t.apply_transform(cur))",
