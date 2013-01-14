@@ -33,12 +33,12 @@ trait OptiWrangle extends ForgeApplication with ScalaOps {
     val stream = ForgePrinter()
 
     // -- DataWrangler
-    val dw_new = op (DataWrangler) ("apply", static, List(), List(MString, MString, MString), DataWrangler, codegenerated, effect = mutable)
-    val dw_new_2 = op (DataWrangler) ("apply", static, List(), List(ASS), DataWrangler, codegenerated, effect = mutable)
-    val dw_cut = op (DataWrangler) ("cut", static, List(), List(DataWrangler, MString), DataWrangler, codegenerated, effect = write(0))
-    val dw_drop = op (DataWrangler) ("drop", static, List(), List(DataWrangler, MInt), DataWrangler, codegenerated, effect = write(0))
-    val dw_delete = op (DataWrangler) ("delete", static, List(), List(DataWrangler, MInt, MString, MInt), DataWrangler, codegenerated, effect = write(0))
-    val dw_write_to_file = op (DataWrangler) ("write_to_file", static, List(), List(DataWrangler, MString), MUnit, codegenerated)
+    val dw_new = op (DataWrangler) ("apply", static, List(), List(MString, MString, MString), DataWrangler, codegenerated)
+    val dw_new_2 = op (DataWrangler) ("apply", static, List(), List(ASS), DataWrangler, codegenerated)
+    val dw_cut = op (DataWrangler) ("cut", infix, List(), List(DataWrangler, MString), DataWrangler, codegenerated)
+    val dw_drop = op (DataWrangler) ("drop", infix, List(), List(DataWrangler, MInt), DataWrangler, codegenerated)
+    val dw_delete = op (DataWrangler) ("delete", infix, List(), List(DataWrangler, MInt, MString, MInt), DataWrangler, codegenerated)
+    val dw_write_to_file = op (DataWrangler) ("write_to_file", infix, List(), List(DataWrangler, MString), MUnit, codegenerated)
   
     //Code Generators - these operations are likely not supported by Forge
     // -- Datawrangler 
@@ -51,8 +51,8 @@ trait OptiWrangle extends ForgeApplication with ScalaOps {
     codegen (dw_drop) ($cala, "new "+dw_cut.tpeName+"(\\\"\\\",\\\"\\\",\\\"\\\","+dw_drop.quotedArg(0)+"._table map (y => {val z = y.toBuffer ; z.remove("+dw_drop.quotedArg(1)+") ; z.toArray}))")
     codegen (dw_delete) ($cala, "new "+dw_cut.tpeName+"(\\\"\\\",\\\"\\\",\\\"\\\","+dw_delete.quotedArg(0)+"._table filter (x => !(x("+dw_delete.quotedArg(1)+").indexOf("+dw_delete.quotedArg(2)+") == "+dw_delete.quotedArg(3)+")))")
 
-    codegen (dw_write_to_file) ($cala, stream.printLines("val outFile = new java.io.PrintStream(new java.io.FileOutputStream("+quotes(dw_write_to_file.quotedArg(1))+"))",
-    quotes(dw_write_to_file.quotedArg(0))+"._table foreach { row =>",
+    codegen (dw_write_to_file) ($cala, stream.printLines("val outFile = new java.io.PrintStream(new java.io.FileOutputStream("+dw_write_to_file.quotedArg(1)+"))",
+    dw_write_to_file.quotedArg(0)+"._table foreach { row =>",
     "  outFile.println(row.mkString(\\\"\\\\\\\",\\\\\\\"\\\"))",
     "}",
     "outFile.close()"), isSimple=false)
