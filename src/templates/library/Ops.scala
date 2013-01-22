@@ -79,11 +79,10 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
     }    
   }
   
-  def emitClass(ops: DSLOps, stream: PrintWriter) {
-    if (grpIsTpe(ops.grp)) {
-      val tpe = grpAsTpe(ops.grp)
-      //val data = DataStructs.filter(_.tpe == tpe).apply(0) // TODO
-      val data = DataStructs.apply(0) // TODO // gibbons4
+  def emitClass(opsGrp: DSLOps, stream: PrintWriter) {
+    if (grpIsTpe(opsGrp.grp)) {
+      val tpe = grpAsTpe(opsGrp.grp)
+      val data = DataStructs.filter(_.tpe == tpe).apply(0) // TODO
       stream.print("class " + data.tpe.name)
       stream.print(makeTpeParsWithBounds(data.tpePars))
       stream.print("(")  
@@ -91,14 +90,6 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       stream.print(") {")
       stream.println()
       stream.println(makeFieldsWithInitArgs(data))
-/*<<<<<<< HEAD
-        if (o.tpePars.length > 0) // gibbons4
-          stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.tail))
-        else 
-          stream.print("  def " + o.name)
-        stream.print("(" + o.args.tail.zipWithIndex.map(t => opArgPrefix + (t._2+1) + ": " + repify(t._1)).mkString(",") + ")") 
-=======
-*/
       for (o <- unique(opsGrp.ops) if o.style == infix) {       
         stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.drop(1)))
         stream.print("(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1) + ": " + repify(t._1)).mkString(",") + ")") 

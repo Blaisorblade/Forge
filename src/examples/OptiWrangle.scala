@@ -80,7 +80,7 @@ trait OptiWrangle extends ForgeApplication with ScalaOps {
     val aas_apply = op (AAS) ("apply", infix, List(T), List(AAS,MInt), T, codegenerated)
     val aas_update = op (AAS) ("update", infix, List(T), List(AAS,MInt,T), MUnit, codegenerated, effect = write(0))
 
-    val aas_cut = op (AAS) ("cut", infix, List(T), List(AAS, MString), AAS, map((AS, AS, AAS), 0, "e => e map (x => x.replaceAll("+quotedArg(1)+", \"\"))"))
+    val aas_cut = op (AAS) ("cut", infix, List(T), List(AAS, MString), AAS, map((MAS, MAS, AAS), 0, "e => e map (x => x.replaceAll("+quotedArg(1)+", \"\"))"))
 
     codegen (aas_new) ($cala, "new "+aas_new.tpeName+"[Array[String]]("+quotedArg(0)+", new Array[Array[String]]("+quotedArg(0)+"))")
     codegen (aas_length) ($cala, quotedArg(0) + "._length")

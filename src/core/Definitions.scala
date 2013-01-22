@@ -22,6 +22,7 @@ trait Definitions {
   lazy val MDouble = tpe("Double")
   lazy val MBoolean = tpe("Boolean")
   lazy val MString = tpe("String")
+  lazy val MAS = tpe("Array[String]")
   lazy val MUnit = tpe("Unit")
   lazy val byName = tpe("Thunk")
   def MThunk(ret: Rep[DSLType]) = ftpe(List(byName), ret)
