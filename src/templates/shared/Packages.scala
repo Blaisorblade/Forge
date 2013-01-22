@@ -19,7 +19,7 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     stream.println("}")
   }
 
-  def emitDSLPackageDefinitionsBase(appOps: List[DSLOps], compOps: List[DSLOps], stream: PrintWriter) {
+  def emitDSLPackageDefinitionsBase(opsGrps: List[DSLOps], stream: PrintWriter) {
     emitBlockComment("dsl definition", stream)
     
     // Lift
@@ -28,12 +28,11 @@ trait BaseGenPackages extends ForgeCodeGenBase {
     if (liftOps.length > 0) {
       stream.print("  extends Lift" + liftOps.head.name)
     }
-    if(liftOps.length > 0)
-    for (grp <- liftOps.tail) {
+    for (grp <- liftOps.drop(1)) {
       stream.print(" with Lift" + grp.name)
     }
     for (e <- Externs if e.withLift) {
-      stream.print(" with Lift" + e.ops.grp.name)
+      stream.print(" with Lift" + e.opsGrp.grp.name)
     }
     stream.print(" {")
     stream.println("  this: " + dsl + " =>")
@@ -43,11 +42,11 @@ trait BaseGenPackages extends ForgeCodeGenBase {
   
     // dsl interface    
     stream.println("trait " + dsl + " extends Base")
-    for (op <- appOps) {
-      stream.print(" with " + op.name)
+    for (opsGrp <- opsGrps) {
+      stream.print(" with " + opsGrp.name)
     }
     for (e <- Externs) {
-      stream.print(" with " + e.ops.name)
+      stream.print(" with " + e.opsGrp.name)
     }    
     stream.println(" { this: " + dsl + "Application => ")
     stream.println()

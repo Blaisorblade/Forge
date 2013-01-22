@@ -121,15 +121,24 @@ trait ForgeCodeGenBase extends GenericCodegen with ScalaGenBase {
     val args2 = args.map { a => a.name + (if (a.ctxBounds != Nil) ":" + a.ctxBounds.map(_.name).mkString(":") else "") }
     "[" + args2.mkString(",") + "]"
   }  
-  def makeTpePars(args: List[Rep[TypePar]]): String = {
+  def makeTpePars(args: List[Rep[DSLType]]): String = {
     if (args.length < 1) return ""
     "[" + args.map(_.name).mkString(",") + "]"
+  }
+  
+  def makeTpeInst(hkTpe: Rep[DSLType], tpeArg: Rep[DSLType]) = hkTpe match {
+    case Def(Tpe(s,args,stage)) => s + "[" + quote(tpeArg) + "]"
+  }
+  
+  def instTpePar(tpePars: List[Rep[TypePar]], par: Rep[DSLType], tpeArg: Rep[DSLType]): List[Rep[DSLType]] = {
+    tpePars.map(e => if (e.name == par.name) tpeArg else e)
   }
   
   override def quote(x: Exp[Any]) : String = x match {
     case Def(Tpe(s,args,stage)) => s + makeTpePars(args)
     case Def(TpeInst(t,args,s)) => t.name + "[" + args.map(quote).mkString(",") + "]"
     case Def(TpePar(s,ctx)) => s 
+    case Sym(n) => err("could not resolve symbol " + findDefinition(n.asInstanceOf[Sym[Any]]).toString + ". All Forge symbols must currently be statically resolvable.")
     case _ => super.quote(x)
   }  
 }

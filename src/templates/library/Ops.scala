@@ -18,44 +18,60 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
   val IR: ForgeApplicationRunner with ForgeExp with ForgeOpsExp
   import IR._
   
-  override def quote(x: Exp[Any]) : String = x match {
-    case Def(PrintLines(p, lines)) => 
-      lines.map(l => (" "*4)+inlineStr(quote(l))).mkString(nl) 
+  override def quote(x: Exp[Any]) : String = x match {    
+    case Def(PrintLines(p, lines)) =>    
+      // since this is called from emitWithIndent, the first line has an extra indent
+      lines.map(l => (" "*4)+quote(l)).mkString(nl) 
+      
+    case Const(s: String) => replaceWildcards(s) // don't add quotes 
+    
     case _ => super.quote(x)
   }  
   
-  def inline(o: Rep[DSLOp], rule: String) = {
-    var b = rule
-    for (i <- 0 until o.args.length) {
-      b = b.replaceAllLiterally(o.quotedArg(i), opArgPrefix + i)
-    }    
-    var c = b
-    for (i <- 0 until o.tpePars.length) {
-      c = c.replaceAllLiterally(o.tpeInstance(i), o.tpePars.apply(i).name)
-    }    
-    inlineStr(c)
+  def emitSingleTaskImpls(opsGrp: DSLOps, stream: PrintWriter) {
+    emitBlockComment("SingleTask Impls", stream)   
+    stream.println()
+    stream.println("trait " + opsGrp.grp.name + "WrapperImpl {")
+    stream.println("  this: " + dsl + "Application => ")
+    stream.println()    
+    for (o <- unique(opsGrp.ops)) { 
+      o.opTpe match {
+        case single:SingleTask => 
+          check(o)
+          stream.print("  " + makeOpImplMethodSignature(o))
+          stream.println(" = {")
+          stream.println(inline(o, single.func))
+          stream.println("  }")
+          stream.println()
+        case _ =>
+      }
+    }
+    stream.println("}")
   }
-  
-  def inlineStr(s: String) = {
-    var x = s
-    val quotePattern = new Regex("""quote\((.*?)\)""", "body")
-    x = quotePattern replaceAllIn (x, m => m.group("body"))
-    
-    if (x.startsWith("\"") && x.endsWith("\"")) (x.slice(1,x.length-1))
-    else x    
-  }
-  
+      
   def emitOp(o: Rep[DSLOp], stream: PrintWriter, indent: Int = 0) {
     val rules = CodeGenRules(o.grp)
     o.opTpe match {
       case `codegenerated` => 
         val rule = rules.find(_.op == o).map(_.rule).getOrElse(err("could not find codegen rule for op: " + o.name))
-        emitWithIndent(inline(o, quote(rule)), stream, indent) 
+        emitWithIndent(inline(o, rule), stream, indent) 
+      case single:SingleTask => 
+        emitWithIndent(makeOpImplMethodNameWithArgs(o), stream, indent)
+      case map:Map =>
+        check(o)
+        val dc = DeliteCollections(map.tpePars._3)        
+        emitWithIndent("def func: " + quote(map.tpePars._1) + " => " + quote(map.tpePars._2) + " = " + inline(o, map.func), stream, indent)            
+        // TODO: this isn't quite right. how do we know which of dc.allocs tpePars is the one that corresponds to our return tpe, e.g. map.tpePars._2?
+        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, map.tpePars._1, map.tpePars._2)) + "(" + makeOpMethodNameWithArgs(dc.size) + ")", stream, indent)
+        emitWithIndent("for (i <- 0 until " + makeOpMethodNameWithArgs(dc.size) + ") {", stream, indent)            
+        emitWithIndent(makeOpMethodName(dc.update) + "(out, i, func(" + makeOpMethodName(dc.apply) + "(" + opArgPrefix+map.argIndex + ", i)))", stream, indent+2)
+        emitWithIndent("}", stream, indent)            
+        emitWithIndent("out", stream, indent)                
       case zip:Zip =>
-        check(zip, o)          
-        val dc = DeliteCollections(o.args.apply(0))        
-        emitWithIndent("def func: (" + quote(zip.tpePars._1) + "," + quote(zip.tpePars._2) + ") => " + quote(zip.tpePars._3) + " = " + zip.func, stream, indent)            
-        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(dc.alloc.tpePars) + "(" + makeOpMethodNameWithArgs(dc.size) + ")", stream, indent)
+        check(o)          
+        val dc = DeliteCollections(zip.tpePars._4)        
+        emitWithIndent("def func: (" + quote(zip.tpePars._1) + "," + quote(zip.tpePars._2) + ") => " + quote(zip.tpePars._3) + " = " + inline(o, zip.func), stream, indent)            
+        emitWithIndent("val out = " + makeOpMethodName(dc.alloc) + makeTpePars(instTpePar(dc.alloc.tpePars, zip.tpePars._1, zip.tpePars._3)) + "(" + makeOpMethodNameWithArgs(dc.size) + ")", stream, indent)
         emitWithIndent("for (i <- 0 until " + makeOpMethodNameWithArgs(dc.size) + ") {", stream, indent)            
         emitWithIndent(makeOpMethodName(dc.update) + "(out, i, func(" + makeOpMethodName(dc.apply) + "(" + opArgPrefix+zip.argIndices._1 + ", i)," + makeOpMethodName(dc.apply) + "(" + opArgPrefix+zip.argIndices._2 + ", i)))", stream, indent+2)
         emitWithIndent("}", stream, indent)            
@@ -75,7 +91,6 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       stream.print(") {")
       stream.println()
       stream.println(makeFieldsWithInitArgs(data))
-      for (o <- unique(ops.ops) if o.style == infix) {       
 /*<<<<<<< HEAD
         if (o.tpePars.length > 0) // gibbons4
           stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.tail))
@@ -84,9 +99,9 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
         stream.print("(" + o.args.tail.zipWithIndex.map(t => opArgPrefix + (t._2+1) + ": " + repify(t._1)).mkString(",") + ")") 
 =======
 */
+      for (o <- unique(opsGrp.ops) if o.style == infix) {       
         stream.print("  def " + o.name + makeTpeParsWithBounds(o.tpePars.drop(1)))
         stream.print("(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1) + ": " + repify(t._1)).mkString(",") + ")") 
-//>>>>>>> master
         stream.print(makeImplicitArgsWithCtxBoundsWithType(o.implicitArgs, o.tpePars, without = data.tpePars))
         stream.println(" = {")
         // cheat a little bit for consistency: the codegen rule may refer to this arg
@@ -98,14 +113,14 @@ trait LibGenOps extends BaseGenOps with BaseGenDataStructures {
       stream.println()
     }      
     
-    for (o <- unique(ops.ops)) {       
+    for (o <- unique(opsGrp.ops)) {       
       stream.print("  def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars))
       stream.print(makeOpArgsWithType(o))
       stream.print(makeOpImplicitArgsWithOverloadWithType(o))
       stream.println(" = {")      
       o.style match {
         case `static` => emitOp(o, stream, indent=4)
-        case `infix` if grpIsTpe(ops.grp) => emitWithIndent(opArgPrefix + 0 + "." + o.name + "(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1)).mkString(",") + ")", stream, 4)
+        case `infix` if grpIsTpe(opsGrp.grp) => emitWithIndent(opArgPrefix + 0 + "." + o.name + "(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1)).mkString(",") + ")", stream, 4)
         case `infix` => emitOp(o, stream, indent=4)
         case `direct` => emitOp(o, stream, indent=4)        
       }

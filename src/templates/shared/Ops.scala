@@ -24,6 +24,23 @@ trait BaseGenOps extends ForgeCodeGenBase {
   /**
    * Quoting for formatted code-gen
    */  
+    
+   def inline(o: Rep[DSLOp], str: Exp[String], quoter: Exp[Any] => String = quote) = {     
+     var b = quoter(str)
+     for (i <- 0 until o.args.length) {
+       b = b.replaceAllLiterally(quoter(o.quotedArg(i)), opArgPrefix + i)
+     }    
+     for (i <- 0 until o.tpePars.length) {
+       b = b.replaceAllLiterally(quoter(o.tpeInstance(i)), o.tpePars.apply(i).name)
+     }    
+     b
+   }  
+      
+   def replaceWildcards(s: String) = {
+     // currently only 1 wildcard
+     s.replaceAll(qu, "\"")
+   }
+   
    override def quote(x: Exp[Any]) : String = x match {
      case Def(QuoteBlockResult(name,List(byName),ret)) => name
      case Def(QuoteBlockResult(name,args,ret)) => name + makeArgs(args)
@@ -124,52 +141,65 @@ trait BaseGenOps extends ForgeCodeGenBase {
   }
   def makeOpMethodNameWithArgs(o: Rep[DSLOp]) = makeOpMethodName(o) + makeFullArgs(o, makeOpArgs)
   def makeOpMethodNameWithFutureArgs(o: Rep[DSLOp]) = makeOpMethodName(o) + makeFullArgs(o, makeOpFutureArgs)
-    
-  def makeSimpleMethod(o: Rep[DSLOp]) = {
+  def makeOpMethodSignature(o: Rep[DSLOp]) = "def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithOverloadWithType(o)
+  def makeSyntaxMethod(o: Rep[DSLOp]) = {
     "def " + o.name + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithNowType(o) + makeOpImplicitArgsWithOverloadWithType(o) + " = " + makeOpMethodNameWithFutureArgs(o)
   }
   
+  def makeOpImplMethodName(o: Rep[DSLOp]) = makeOpMethodName(o) + "_impl"
+  def makeOpImplMethodNameWithArgs(o: Rep[DSLOp]) = makeOpImplMethodName(o) + makeFullArgs(o, makeOpFutureArgs)
+  def makeOpImplMethodSignature(o: Rep[DSLOp]) = "def " + makeOpImplMethodName(o) + makeTpeParsWithBounds(o.tpePars) + makeOpArgsWithType(o) + makeOpImplicitArgsWithOverloadWithType(o)  
   
   /**
    * Delite op sanity checking
    */
-  def check(d: DeliteOpType, o: Rep[DSLOp]) { 
-    d match {
+  def check(o: Rep[DSLOp]) { 
+    o.opTpe match {
+      case single:SingleTask => // nothing to check
+      case map:Map =>
+        val col = o.args.apply(map.argIndex)
+        if (DeliteCollections.get(col).isEmpty) err("map argument " + col.name + " is not a DeliteCollection")
+        if (map.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("map op with undefined type arg: " + o.name)
+        if (map.argIndex < 0 || map.argIndex > o.args.length) err("map op with illegal arg parameter: " + o.name)
       case zip:Zip =>
-       if (zip.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("zipWith op with undefined type arg: " + o.name)
-       if (zip.argIndices.productIterator.asInstanceOf[Iterator[Int]].exists(a => a < 0 || a > o.args.length)) err("zipWith op with illegal arg parameter: " + o.name)
+        val colA = o.args.apply(zip.argIndices._1)
+        val colB = o.args.apply(zip.argIndices._2)
+        if (DeliteCollections.get(colA).isEmpty) err("zip argument " + colA.name + " is not a DeliteCollection")
+        if (DeliteCollections.get(colB).isEmpty) err("zip argument " + colB.name + " is not a DeliteCollection")
+        if (zip.tpePars.productIterator.exists(a => a.isInstanceOf[TypePar] && !o.tpePars.contains(a))) err("zipWith op with undefined type arg: " + o.name)
+        if (zip.argIndices.productIterator.asInstanceOf[Iterator[Int]].exists(a => a < 0 || a > o.args.length)) err("zipWith op with illegal arg parameter: " + o.name)
     }
   }
   
   /**
    * Front-end codegen
    */
-  def emitOpSyntax(ops: DSLOps, stream: PrintWriter) {
+  def emitOpSyntax(opsGrp: DSLOps, stream: PrintWriter) {
     emitBlockComment("Operations", stream)
     stream.println()
-    stream.println("trait " + ops.grp.name + "Ops extends " + baseOpsCls(ops.grp) + " {")
+    stream.println("trait " + opsGrp.name + " extends " + baseOpsCls(opsGrp.grp) + " {")
     stream.println("  this: " + dsl + " => ")
     stream.println()
         
     // static ops
-    val staticOps = ops.ops.filter(e=>e.style==static)
+    val staticOps = opsGrp.ops.filter(e=>e.style==static)
     if (staticOps.length > 0) {
-      stream.println("  object " + ops.grp.name + " {")
+      stream.println("  object " + opsGrp.grp.name + " {")
       for (o <- staticOps) {        
-        stream.println("    " + makeSimpleMethod(o))
+        stream.println("    " + makeSyntaxMethod(o))
       }
       stream.println("  }")
     }
     stream.println()
     
     // direct ops
-    val directOps = ops.ops.filter(e=>e.style==direct)
+    val directOps = opsGrp.ops.filter(e=>e.style==direct)
     for (o <- directOps) {
-      stream.println("  " + makeSimpleMethod(o))
+      stream.println("  " + makeSyntaxMethod(o))
     }
     
     // infix ops
-    val infixOps = ops.ops.filter(e=>e.style==infix)
+    val infixOps = opsGrp.ops.filter(e=>e.style==infix)
     
     // certain ops (e.g. "apply" cannot be expressed with infix notation right now), so we use implicits as a workaround
     val needPimpClass = (noInfixList intersect infixOps.map(_.name)).nonEmpty
@@ -178,7 +208,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     if (needPimpClass) {
       // set up a pimp-my-library style promotion
       // can only do this on DSL types
-      val tpe = grpAsTpe(ops.grp)                
+      val tpe = grpAsTpe(opsGrp.grp)                
       pimpStream.appendLine("  implicit def repTo" + tpe.name + "Ops" + makeTpeParsWithBounds(tpe.tpePars) + "(x: " + repify(tpe) + ") = new " + tpe.name + "OpsCls(x)")
       if (OpsGrp.exists(g => g._2.ops.exists(o => o.name == "__newVar"))) {
         pimpStream.appendLine("  implicit def varTo" + tpe.name + "Ops" + makeTpeParsWithBounds(tpe.tpePars) + "(x: " + varify(tpe) + ") = new " + tpe.name + "OpsCls(readVar(x))")
@@ -189,7 +219,7 @@ trait BaseGenOps extends ForgeCodeGenBase {
     
     for (o <- infixOps) {
       if (noInfixList.contains(o.name)) {
-        val tpe = grpAsTpe(ops.grp)
+        val tpe = grpAsTpe(opsGrp.grp)
         val otherArgs = "(" + o.args.drop(1).zipWithIndex.map(t => opArgPrefix + (t._2+1) + ": " + repifySome(t._1)).mkString(",") + ")"
         pimpStream.appendLine("    def " + o.name + makeTpeParsWithBounds(o.tpePars.diff(tpe.tpePars)) + otherArgs
           + (makeImplicitArgsWithCtxBoundsWithType(implicitArgsWithOverload(o), o.tpePars, without = tpe.tpePars)) + " = " + makeOpMethodNameWithFutureArgs(o))
@@ -209,11 +239,8 @@ trait BaseGenOps extends ForgeCodeGenBase {
     }
     
     // abstract methods
-    for (o <- unique(ops.ops)) {
-      stream.print("  def " + makeOpMethodName(o) + makeTpeParsWithBounds(o.tpePars))
-      stream.print(makeOpArgsWithType(o))
-      stream.print(makeOpImplicitArgsWithOverloadWithType(o) + ": " + repify(o.retTpe))
-      stream.println()
+    for (o <- unique(opsGrp.ops)) {
+      stream.println("  " + makeOpMethodSignature(o) + ": " + repify(o.retTpe))
     }
     
     stream.println("}")
