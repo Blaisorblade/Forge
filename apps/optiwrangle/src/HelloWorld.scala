@@ -8,10 +8,17 @@ object HelloWranglerInterpreter extends OptiWrangleApplicationInterpreter with H
 trait HelloWrangler extends OptiWrangleApplication { 
   def main() = {
     println("hello world")    
+/*
     val dw = DataWrangler("/afs/cs.stanford.edu/u/gibbons4/data/Flickr_10--130_to_25--120_pulled_2012-10-01.csv", "\n", ",")
     dw.cut("\"")
     dw.write_to_file("/afs/cs.stanford.edu/u/gibbons4/data/test.out") 
-    
+  */
+
+    val table = Table(1)
+    val test = AS(1)
+    test(0) = "Hi"
+    table(0) = test
+
     // if side effect updates are too unwieldy it will instead look like
     //val dw0 = DataWrangler("/afs/cs.stanford.edu/u/gibbons4/data/Flickr_10--130_to_25--120_pulled_2012-10-01.csv", "\n", ",")
     //val dw1 = dw0.cut("\"")

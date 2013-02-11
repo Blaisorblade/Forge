@@ -1,4 +1,4 @@
-package stringvector.extern
+package stringv.extern
 
 import scala.annotation.unchecked.uncheckedVariance
 import scala.reflect.{Manifest,SourceContext}
@@ -16,7 +16,7 @@ implicit class TString(s: String) {
   def infix_+(o: String): TString = new TString(this.s + o)
 }
 */
-
+/*
 trait CanAddOps extends Variables {
   
   trait CanAdd[A] {
@@ -31,7 +31,7 @@ trait CanAddOps extends Variables {
     def +(a: Rep[String], b: Rep[String]): Rep[String] = {return a.+(b)}
   }
 }
-
+*/
 /*
 object StringWrapper {
   implicit def CanAddFoo = new CanAdd[String] {

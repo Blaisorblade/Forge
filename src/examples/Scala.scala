@@ -15,6 +15,7 @@ trait ScalaOps extends ForgeApplication {
     numerics()
     ordering()
     strings()
+    arrays()
   }
   
   /**
@@ -74,7 +75,14 @@ trait ScalaOps extends ForgeApplication {
     codegen (lt) ($cala, lt.quotedArg(0) + " < " + lt.quotedArg(1))    
     codegen (gt) ($cala, gt.quotedArg(0) + " > " + gt.quotedArg(1))
   }
-  
+ 
+  def arrays() = {
+    val Arr = grp("Array[String]")
+    lift (Arr) (MAS)
+
+    //val map = op (Arr) ("map", infix, List(), List(MAS, ))
+  }
+ 
   def strings() = {
     val Str = grp("String")
     lift (Str) (MString)
@@ -100,6 +108,7 @@ trait ScalaOps extends ForgeApplication {
     // Rep[String], Rep[String]
     val concat9 = op (Str) ("+", infix, List(), List(MString, CString), MString, codegenerated)
     val concat10 = op (Str) ("+", infix, List(), List(CString, MString), MString, codegenerated)
+    val concat11 = op (Str) ("+", infix, List(), List(MString, MString), MString, codegenerated)
     
     // TODO: we would like overloaded variants to possibly use the same codegen impl instead of being redundant here    
     // most of the concat codegens are not used, but it is not easy to tell which ones will "make it"
@@ -116,5 +125,6 @@ trait ScalaOps extends ForgeApplication {
     codegen (concat8) ($cala, scalaStrConcat(concat8))
     codegen (concat9) ($cala, scalaStrConcat(concat9))
     codegen (concat10) ($cala, scalaStrConcat(concat10))
+    codegen (concat11) ($cala, scalaStrConcat(concat11))
   }
 }
